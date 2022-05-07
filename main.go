@@ -1,7 +1,7 @@
 package main
 
 /*
-#cgo LDFLAGS: -L/home/gldeng/local/gldeng/multi-party-bls-wrapper/target/release -lmulti_party_bls_wrapper
+#cgo LDFLAGS: -L./target/release -lmulti_party_bls_wrapper
 #include <stdio.h>
 #include <stdlib.h>
 #include "./bls.h"
