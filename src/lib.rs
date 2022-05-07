@@ -1,11 +1,31 @@
+#![feature(proc_macro_hygiene)]
 use bls::threshold_bls::state_machine::keygen::{Keygen, LocalKey};
 use round_based::{Msg, StateMachine};
 use std::convert::From;
 use std::ffi::CStr;
 use std::ffi::CString;
 use cty::c_char;
+use concat_idents::concat_idents;
 
 type KeygenMsg = Msg<<Keygen as StateMachine>::MessageBody>;
+
+macro_rules! create_function {
+    // This macro takes an argument of designator `ident` and
+    // creates a function named `$func_name`.
+    // The `ident` designator is used for variable/function names.
+    ($sm_type:ty,$sm_name:ident,$func_name:ident) => {
+        concat_idents!(full_name=$sm_name, _, $func_name, {
+            #[no_mangle]
+            pub extern "C" fn full_name(state: Option<&$sm_type>) -> cty::c_int {
+                match state {
+                    Some(state) => { cty::c_int::from(state.$func_name()) }
+                    None => { -1 }
+                }
+            }
+        });
+    };
+}
+
 
 #[no_mangle]
 pub extern "C" fn new_keygen(i: cty::c_int, t: cty::c_int, n: cty::c_int) -> *mut Keygen {
@@ -26,14 +46,6 @@ pub unsafe extern "C" fn free_keygen(state: *mut Keygen) {
 }
 
 #[no_mangle]
-pub extern "C" fn keygen_current_round(state: Option<&Keygen>) -> cty::c_int {
-    match state {
-        Some(state) => { cty::c_int::from(state.current_round()) }
-        None => { -1 }
-    }
-}
-
-#[no_mangle]
 pub extern "C" fn keygen_total_rounds(state: Option<&Keygen>) -> cty::c_int {
     match state {
         Some(state) => {
@@ -46,37 +58,16 @@ pub extern "C" fn keygen_total_rounds(state: Option<&Keygen>) -> cty::c_int {
     }
 }
 
-#[no_mangle]
-pub extern "C" fn keygen_party_ind(state: Option<&Keygen>) -> cty::c_int {
-    match state {
-        Some(state) => { cty::c_int::from(state.party_ind()) }
-        None => { -1 }
-    }
-}
+create_function!(Keygen, keygen, current_round);
 
-#[no_mangle]
-pub extern "C" fn keygen_parties(state: Option<&Keygen>) -> cty::c_int {
-    match state {
-        Some(state) => { cty::c_int::from(state.parties()) }
-        None => { -1 }
-    }
-}
+create_function!(Keygen, keygen, party_ind);
 
-#[no_mangle]
-pub extern "C" fn keygen_is_finished(state: Option<&Keygen>) -> cty::c_int {
-    match state {
-        Some(state) => { cty::c_int::from(state.is_finished()) }
-        None => { -1 }
-    }
-}
+create_function!(Keygen, keygen, parties);
 
-#[no_mangle]
-pub extern "C" fn keygen_wants_to_proceed(state: Option<&Keygen>) -> cty::c_int {
-    match state {
-        Some(state) => { cty::c_int::from(state.wants_to_proceed()) }
-        None => { -1 }
-    }
-}
+create_function!(Keygen, keygen, is_finished);
+
+create_function!(Keygen, keygen, wants_to_proceed);
+
 
 #[no_mangle]
 pub extern "C" fn keygen_has_outgoing(state: Option<& mut Keygen>) -> cty::c_int {
@@ -144,18 +135,7 @@ pub unsafe extern "C" fn keygen_outgoing(state: Option<&mut Keygen>, buf: *mut c
                     let res = serde_json::to_string(&msg);
                     match res {
                         Ok(str) => {
-                            let src = str.as_bytes().as_ptr();
-                            let len = str.as_bytes().len();
-                            let len_c_int = len as cty::c_int;
-                            if len_c_int <= maxlen - 1 {
-                                unsafe {
-                                    std::ptr::copy(src, buf as *mut u8, len);
-                                    (*buf.offset(len as isize)) = 0;
-                                }
-                                len_c_int
-                            } else {
-                                -3
-                            }
+                            write_to_buffer(&str, buf, maxlen)
                         }
                         Err(e) => {
                             -2
@@ -169,6 +149,21 @@ pub unsafe extern "C" fn keygen_outgoing(state: Option<&mut Keygen>, buf: *mut c
     }
 }
 
+unsafe fn write_to_buffer(output:&String, buf: *mut cty::c_char, maxlen: cty::c_int) -> cty::c_int {
+    let src = output.as_bytes().as_ptr();
+    let len = output.as_bytes().len();
+    let len_c_int = len as cty::c_int;
+    if len_c_int <= maxlen - 1 {
+        unsafe {
+            std::ptr::copy(src, buf as *mut u8, len);
+            (*buf.offset(len as isize)) = 0;
+        }
+        len_c_int
+    } else {
+        -3
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn keygen_pick_output(state: Option<&mut Keygen>, buf: *mut cty::c_char, maxlen: cty::c_int) -> cty::c_int {
     match state {
@@ -179,18 +174,7 @@ pub unsafe extern "C" fn keygen_pick_output(state: Option<&mut Keygen>, buf: *mu
                     let res = serde_json::to_string(&localKey);
                     match res {
                         Ok(str) => {
-                            let src = str.as_bytes().as_ptr();
-                            let len = str.as_bytes().len();
-                            let len_c_int = len as cty::c_int;
-                            if len_c_int <= maxlen - 1 {
-                                unsafe {
-                                    std::ptr::copy(src, buf as *mut u8, len);
-                                    (*buf.offset(len as isize)) = 0;
-                                }
-                                len_c_int
-                            } else {
-                                -3
-                            }
+                            write_to_buffer(&str, buf, maxlen)
                         }
                         Err(e) => {
                             -2
