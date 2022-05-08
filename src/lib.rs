@@ -1,155 +1,77 @@
 #![feature(proc_macro_hygiene)]
+
 use bls::threshold_bls::state_machine::keygen::{Keygen, LocalKey};
+use bls::threshold_bls::state_machine::sign::{Sign};
 use round_based::{Msg, StateMachine};
 use std::convert::From;
 use std::ffi::CStr;
 use std::ffi::CString;
+use std::fmt::Debug;
+use bls::basic_bls::BLSSignature;
 use cty::c_char;
 use concat_idents::concat_idents;
+use anyhow::Result;
 
-type KeygenMsg = Msg<<Keygen as StateMachine>::MessageBody>;
+trait ToI32: Sized {
+    fn to_i32(self) -> i32;
+}
 
-macro_rules! create_function {
-    // This macro takes an argument of designator `ident` and
-    // creates a function named `$func_name`.
-    // The `ident` designator is used for variable/function names.
-    ($sm_type:ty,$sm_name:ident,$func_name:ident) => {
-        concat_idents!(full_name=$sm_name, _, $func_name, {
-            #[no_mangle]
-            pub extern "C" fn full_name(state: Option<&$sm_type>) -> cty::c_int {
-                match state {
-                    Some(state) => { cty::c_int::from(state.$func_name()) }
-                    None => { -1 }
-                }
+impl ToI32 for Option<u16> {
+    fn to_i32(self) -> i32 {
+        match self {
+            Some(num) => {
+                i32::from(num)
             }
-        });
-    };
-}
-
-
-#[no_mangle]
-pub extern "C" fn new_keygen(i: cty::c_int, t: cty::c_int, n: cty::c_int) -> *mut Keygen {
-    let state = Keygen::new(i as u16, t as u16, n as u16);
-    match state {
-        Ok(state) => { Box::into_raw(Box::new(state)) }
-        Err(e) => {
-            println!("error: {:?}", e);
-            std::ptr::null_mut()
+            None => { -1 }
         }
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn free_keygen(state: *mut Keygen) {
-    assert!(!state.is_null());
-    Box::from_raw(state); // Rust auto-drops it
+impl ToI32 for bool {
+    fn to_i32(self) -> i32 {
+        i32::from(self)
+    }
 }
 
-#[no_mangle]
-pub extern "C" fn keygen_total_rounds(state: Option<&Keygen>) -> cty::c_int {
-    match state {
-        Some(state) => {
-            match state.total_rounds() {
-                Some(tr) => { cty::c_int::from(tr) }
-                None => { -1 }
+impl ToI32 for u16 {
+    fn to_i32(self) -> i32 {
+        i32::from(self)
+    }
+}
+
+trait StateMachineOutput {
+    fn pick_string_output(&mut self) -> Option<String>;
+}
+
+impl StateMachineOutput for Keygen {
+    fn pick_string_output(&mut self) -> Option<String> {
+        match self.pick_output() {
+            Some(Ok(res))=> {
+                let res = serde_json::to_string(&res).unwrap_or_default();
+                Some(res)
             }
+            Some(Err(_)) => {None}
+            None => {None}
         }
-        None => { -1 }
     }
 }
 
-create_function!(Keygen, keygen, current_round);
-
-create_function!(Keygen, keygen, party_ind);
-
-create_function!(Keygen, keygen, parties);
-
-create_function!(Keygen, keygen, is_finished);
-
-create_function!(Keygen, keygen, wants_to_proceed);
-
-
-#[no_mangle]
-pub extern "C" fn keygen_has_outgoing(state: Option<& mut Keygen>) -> cty::c_int {
-    match state {
-        Some(state) => { state.message_queue().len() as cty::c_int }
-        None => { -1 }
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn keygen_proceed(state: Option<&mut Keygen>) -> cty::c_int {
-    match state {
-        Some(state) => {
-            match state.proceed() {
-                Ok(_) => {0}
-                Err(e) => {
-                    println!("error: {:?}", e);
-                    -2
-                }
+impl StateMachineOutput for Sign {
+    fn pick_string_output(&mut self) -> Option<String> {
+        match self.pick_output() {
+            Some(Ok((_, sig)))=> {
+                let compressed = true;
+                let bytes = sig.to_bytes(compressed);
+                let sig = hex::encode(bytes.as_slice());
+                Some(sig)
             }
-
-        }
-        None => { -1 }
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn keygen_incoming(state: Option<&mut Keygen>, buf: *const cty::c_char) -> cty::c_int {
-    match state {
-        Some(state) => {
-            let arr = unsafe { CStr::from_ptr(buf).to_bytes() };
-            let res = serde_json::from_slice::<KeygenMsg>(arr);
-            match res {
-                Ok(msg) => {
-                    let hRes = state.handle_incoming(msg);
-                    match hRes {
-                        Ok(_) => {
-                            0
-                        }
-                        Err(e) => {
-                            println!("error: {:?}", e);
-                            -1
-                        }
-                    }
-                }
-                Err(e) => {
-                    println!("error: {:?}", e);
-                    -1
-                }
-            }
-        }
-        None => {
-            -1
+            Some(Err(_)) => {None}
+            None => {None}
         }
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn keygen_outgoing(state: Option<&mut Keygen>, buf: *mut cty::c_char, maxlen: cty::c_int) -> cty::c_int {
-    match state {
-        Some(state) => {
-            let msg = state.message_queue().drain(..1).next();
-            match msg {
-                Some(msg) => {
-                    let res = serde_json::to_string(&msg);
-                    match res {
-                        Ok(str) => {
-                            write_to_buffer(&str, buf, maxlen)
-                        }
-                        Err(e) => {
-                            -2
-                        }
-                    }
-                }
-                None => { 0 }
-            }
-        }
-        None => { -1 }
-    }
-}
-
-unsafe fn write_to_buffer(output:&String, buf: *mut cty::c_char, maxlen: cty::c_int) -> cty::c_int {
+unsafe fn write_to_buffer(output: &String, buf: *mut cty::c_char, maxlen: cty::c_int) -> cty::c_int {
     let src = output.as_bytes().as_ptr();
     let len = output.as_bytes().len();
     let len_c_int = len as cty::c_int;
@@ -164,33 +86,240 @@ unsafe fn write_to_buffer(output:&String, buf: *mut cty::c_char, maxlen: cty::c_
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn keygen_pick_output(state: Option<&mut Keygen>, buf: *mut cty::c_char, maxlen: cty::c_int) -> cty::c_int {
-    match state {
-        Some(state) => {
-            let output = state.pick_output();
-            match output {
-                Some(Ok(localKey)) => {
-                    let res = serde_json::to_string(&localKey);
-                    match res {
-                        Ok(str) => {
-                            write_to_buffer(&str, buf, maxlen)
-                        }
-                        Err(e) => {
-                            -2
-                        }
-                    }
-                }
-                Some(Err(e)) => {
-                    println!("error: {:?}", e);
-                    -1
-                }
-                None => {
-                    println!("error: Not finished yet.");
-                    -1
+fn ret_or_err<T, E>(res: Result<T, E>) -> *mut T where E: Debug{
+    match res {
+        Ok(res) => { Box::into_raw(Box::new(res)) }
+        Err(e) => {
+            println!("error: {:?}", e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+macro_rules! create_function {
+    // This macro takes an argument of designator `ident` and
+    // creates a function named `$func_name`.
+    // The `ident` designator is used for variable/function names.
+    ($sm_type:ty,$sm_name:ident,$func_name:ident) => {
+        concat_idents!(full_name=$sm_name, _, $func_name, {
+            #[no_mangle]
+            pub extern "C" fn full_name(state: Option<&$sm_type>) -> cty::c_int {
+                match state {
+                    Some(state) => { state.$func_name().to_i32() }
+                    None => { -1 }
                 }
             }
+        });
+    };
+}
+
+macro_rules! create_free_function {
+    ($sm_type:ty,$sm_name:ident) => {
+        concat_idents!(full_name=free, _, $sm_name, {
+            #[no_mangle]
+            pub unsafe extern "C" fn full_name(state: *mut $sm_type) {
+                assert!(!state.is_null());
+                Box::from_raw(state); // Rust auto-drops it
+            }
+        });
+    };
+}
+
+macro_rules! create_has_outgoing_function {
+    ($sm_type:ty,$sm_name:ident) => {
+        concat_idents!(full_name=$sm_name, _, has_outgoing, {
+            #[no_mangle]
+            pub extern "C" fn full_name(state: Option<& mut $sm_type>) -> cty::c_int {
+                match state {
+                    Some(state) => { state.message_queue().len() as cty::c_int }
+                    None => { -1 }
+                }
+            }
+        });
+    };
+}
+
+macro_rules! create_proceed_function {
+    ($sm_type:ty,$sm_name:ident) => {
+        concat_idents!(full_name=$sm_name, _, proceed, {
+            #[no_mangle]
+            pub unsafe extern "C" fn full_name(state: Option<&mut $sm_type>) -> cty::c_int {
+                match state {
+                    Some(state) => {
+                        match state.proceed() {
+                            Ok(_) => {0}
+                            Err(e) => {
+                                println!("error: {:?}", e);
+                                -2
+                            }
+                        }
+
+                    }
+                    None => { -1 }
+                }
+            }
+        });
+    };
+}
+
+macro_rules! create_incoming_function {
+    ($sm_type:ty,$sm_name:ident) => {
+        concat_idents!(full_name=$sm_name, _, incoming, {
+            #[no_mangle]
+            pub unsafe extern "C" fn full_name(state: Option<&mut $sm_type>, buf: *const cty::c_char) -> cty::c_int {
+                match state {
+                    Some(state) => {
+                        let arr = unsafe { CStr::from_ptr(buf).to_bytes() };
+                        let res = serde_json::from_slice::<Msg<<$sm_type as StateMachine>::MessageBody>>(arr);
+                        match res {
+                            Ok(msg) => {
+                                let hRes = state.handle_incoming(msg);
+                                match hRes {
+                                    Ok(_) => {
+                                        0
+                                    }
+                                    Err(e) => {
+                                        println!("error: {:?}", e);
+                                        -1
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                println!("error: {:?}", e);
+                                -1
+                            }
+                        }
+                    }
+                    None => {
+                        -1
+                    }
+                }
+            }
+        });
+    };
+}
+
+macro_rules! create_outgoing_function {
+    ($sm_type:ty,$sm_name:ident) => {
+        concat_idents!(full_name=$sm_name, _, outgoing, {
+
+            #[no_mangle]
+            pub unsafe extern "C" fn full_name(state: Option<&mut $sm_type>, buf: *mut cty::c_char, maxlen: cty::c_int) -> cty::c_int {
+                match state {
+                    Some(state) => {
+                        let msg = state.message_queue().drain(..1).next();
+                        match msg {
+                            Some(msg) => {
+                                let res = serde_json::to_string(&msg);
+                                match res {
+                                    Ok(str) => {
+                                        write_to_buffer(&str, buf, maxlen)
+                                    }
+                                    Err(e) => {
+                                        -2
+                                    }
+                                }
+                            }
+                            None => { 0 }
+                        }
+                    }
+                    None => { -1 }
+                }
+            }
+        });
+    };
+}
+
+macro_rules! create_pick_output_function {
+    ($sm_type:ty,$sm_name:ident) => {
+        concat_idents!(full_name=$sm_name, _, pick_output, {
+
+            #[no_mangle]
+            pub unsafe extern "C" fn full_name(state: Option<&mut $sm_type>, buf: *mut cty::c_char, maxlen: cty::c_int) -> cty::c_int {
+                match state {
+                    Some(state) => {
+                        let output = state.pick_string_output();
+                        match output {
+                            Some(str) => {
+                                // let str = output.output_to_string();
+                                write_to_buffer(&str, buf, maxlen)
+                                // let res = serde_json::to_string(&output);
+                                // match res {
+                                //     Ok(str) => {
+                                //         write_to_buffer(&str, buf, maxlen)
+                                //     }
+                                //     Err(e) => {
+                                //         -2
+                                //     }
+                                // }
+                            }
+                            None => {
+                                -1
+                            }
+                        }
+                    }
+                    None => { -1 }
+                }
+            }
+        });
+    };
+}
+
+macro_rules! create_wrapper {
+    ($sm_type:ty,$sm_name:ident) => {
+
+        create_free_function!($sm_type, $sm_name);
+
+        create_has_outgoing_function!($sm_type, $sm_name);
+
+        create_proceed_function!($sm_type, $sm_name);
+
+        create_incoming_function!($sm_type, $sm_name);
+
+        create_outgoing_function!($sm_type, $sm_name);
+
+        create_pick_output_function!($sm_type, $sm_name);
+
+        create_function!($sm_type, $sm_name, total_rounds);
+
+        create_function!($sm_type, $sm_name, current_round);
+
+        create_function!($sm_type, $sm_name, party_ind);
+
+        create_function!($sm_type, $sm_name, parties);
+
+        create_function!($sm_type, $sm_name, is_finished);
+
+        create_function!($sm_type, $sm_name, wants_to_proceed);
+
+    };
+}
+
+create_wrapper!(Keygen, keygen);
+
+create_wrapper!(Sign, sign);
+
+#[no_mangle]
+pub extern "C" fn new_keygen(i: cty::c_int, t: cty::c_int, n: cty::c_int) -> *mut Keygen {
+    let state = Keygen::new(i as u16, t as u16, n as u16);
+    ret_or_err(state)
+}
+
+#[no_mangle]
+pub extern "C" fn new_sign(message_hash: *const cty::c_char, i: cty::c_int, n: cty::c_int, local_key: *const cty::c_char) -> *mut Sign {
+    let message_hash = unsafe { CStr::from_ptr(message_hash).to_bytes() };
+    let message_hash = message_hash.to_vec();
+    let local_key = unsafe { CStr::from_ptr(local_key).to_bytes() };
+    let local_key = serde_json::from_slice::<LocalKey>(local_key);
+
+    match local_key {
+        Ok(local_key) => {
+            let state = Sign::new(message_hash, i as u16, n as u16, local_key);
+            ret_or_err(state)
         }
-        None => { -1 }
+        Err(e) => {
+            println!("error: {:?}", e);
+            std::ptr::null_mut()
+        }
     }
 }
