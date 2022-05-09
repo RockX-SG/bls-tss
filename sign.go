@@ -1,7 +1,7 @@
 package bls_tss
 
 /*
-#cgo LDFLAGS: -L./lib/target/release -lbls_tss
+#cgo LDFLAGS: ./lib/libbls_tss.a -ldl -lgmp -lm
 #include <stdio.h>
 #include <stdlib.h>
 #include "./lib/tss.h"
