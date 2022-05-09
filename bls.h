@@ -15,7 +15,7 @@ int keygen_pick_output(void* state, char* buf, int maxlen);
 int keygen_incoming(void* state, const char* msg);
 int keygen_outgoing(void* state, char* buf, int maxlen);
 
-void* new_sign(int i, int t, int n);
+void* new_sign(const char* msg_hash, int i, int n, const char* local_key);
 void free_sign(void* state);
 int sign_current_round(const void* state);
 int sign_total_rounds(const void* state);
