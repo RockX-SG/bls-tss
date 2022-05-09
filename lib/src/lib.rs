@@ -12,6 +12,13 @@ use cty::c_char;
 use concat_idents::concat_idents;
 use anyhow::Result;
 
+const STATUS_OK: i32 = -0x0000;
+const ERROR_STATE_IS_NULL: i32 = -0x1001;
+const ERROR_NULL_OR_EMPTY_VALUE: i32 = -0x2001;
+const ERROR_STATE_MACHINE_INTERNAL_ERROR: i32 = -0x3001;
+const ERROR_INTEROP_BUFFER_TOO_SMALL_ERROR: i32 = -0x4001;
+const ERROR_MESSAGE_SERDE_ERROR: i32 = -0x5001;
+
 trait ToI32: Sized {
     fn to_i32(self) -> i32;
 }
@@ -22,7 +29,7 @@ impl ToI32 for Option<u16> {
             Some(num) => {
                 i32::from(num)
             }
-            None => { -1 }
+            None => { ERROR_NULL_OR_EMPTY_VALUE }
         }
     }
 }
@@ -40,33 +47,33 @@ impl ToI32 for u16 {
 }
 
 trait StateMachineOutput {
-    fn pick_string_output(&mut self) -> Option<String>;
+    fn pick_string_output(&mut self) -> (Option<String>, i32);
 }
 
 impl StateMachineOutput for Keygen {
-    fn pick_string_output(&mut self) -> Option<String> {
+    fn pick_string_output(&mut self) -> (Option<String>, i32) {
         match self.pick_output() {
-            Some(Ok(res))=> {
+            Some(Ok(res)) => {
                 let res = serde_json::to_string(&res).unwrap_or_default();
-                Some(res)
+                (Some(res), STATUS_OK)
             }
-            Some(Err(_)) => {None}
-            None => {None}
+            Some(Err(_)) => { (None, ERROR_STATE_MACHINE_INTERNAL_ERROR) }
+            None => { (None, STATUS_OK) }
         }
     }
 }
 
 impl StateMachineOutput for Sign {
-    fn pick_string_output(&mut self) -> Option<String> {
+    fn pick_string_output(&mut self) -> (Option<String>, i32) {
         match self.pick_output() {
-            Some(Ok((_, sig)))=> {
+            Some(Ok((_, sig))) => {
                 let compressed = true;
                 let bytes = sig.to_bytes(compressed);
                 let sig = hex::encode(bytes.as_slice());
-                Some(sig)
+                (Some(sig), STATUS_OK)
             }
-            Some(Err(_)) => {None}
-            None => {None}
+            Some(Err(_)) => { (None, ERROR_STATE_MACHINE_INTERNAL_ERROR) }
+            None => { (None, STATUS_OK) }
         }
     }
 }
@@ -82,11 +89,11 @@ unsafe fn write_to_buffer(output: &String, buf: *mut cty::c_char, max_len: cty::
         }
         len_c_int
     } else {
-        -3
+        ERROR_INTEROP_BUFFER_TOO_SMALL_ERROR
     }
 }
 
-fn ret_or_err<T, E>(res: Result<T, E>) -> *mut T where E: Debug{
+fn ret_or_err<T, E>(res: Result<T, E>) -> *mut T where E: Debug {
     match res {
         Ok(res) => { Box::into_raw(Box::new(res)) }
         Err(e) => {
@@ -106,7 +113,7 @@ macro_rules! create_function {
             pub extern "C" fn full_name(state: Option<&$sm_type>) -> cty::c_int {
                 match state {
                     Some(state) => { state.$func_name().to_i32() }
-                    None => { -1 }
+                    None => { ERROR_STATE_IS_NULL }
                 }
             }
         });
@@ -132,7 +139,7 @@ macro_rules! create_has_outgoing_function {
             pub extern "C" fn full_name(state: Option<& mut $sm_type>) -> cty::c_int {
                 match state {
                     Some(state) => { state.message_queue().len() as cty::c_int }
-                    None => { -1 }
+                    None => { ERROR_STATE_IS_NULL }
                 }
             }
         });
@@ -147,15 +154,15 @@ macro_rules! create_proceed_function {
                 match state {
                     Some(state) => {
                         match state.proceed() {
-                            Ok(_) => {0}
+                            Ok(_) => {STATUS_OK}
                             Err(e) => {
                                 println!("error: {:?}", e);
-                                -2
+                                ERROR_STATE_MACHINE_INTERNAL_ERROR
                             }
                         }
 
                     }
-                    None => { -1 }
+                    None => { ERROR_STATE_IS_NULL }
                 }
             }
         });
@@ -176,22 +183,22 @@ macro_rules! create_incoming_function {
                                 let hRes = state.handle_incoming(msg);
                                 match hRes {
                                     Ok(_) => {
-                                        0
+                                        STATUS_OK
                                     }
                                     Err(e) => {
                                         println!("error: {:?}", e);
-                                        -1
+                                        ERROR_STATE_MACHINE_INTERNAL_ERROR
                                     }
                                 }
                             }
                             Err(e) => {
                                 println!("error: {:?}", e);
-                                -1
+                                ERROR_MESSAGE_SERDE_ERROR
                             }
                         }
                     }
                     None => {
-                        -1
+                        ERROR_STATE_IS_NULL
                     }
                 }
             }
@@ -216,14 +223,14 @@ macro_rules! create_outgoing_function {
                                         write_to_buffer(&str, buf, max_len)
                                     }
                                     Err(e) => {
-                                        -2
+                                        ERROR_MESSAGE_SERDE_ERROR
                                     }
                                 }
                             }
-                            None => { 0 }
+                            None => { STATUS_OK }
                         }
                     }
-                    None => { -1 }
+                    None => { ERROR_STATE_IS_NULL }
                 }
             }
         });
@@ -240,15 +247,15 @@ macro_rules! create_pick_output_function {
                     Some(state) => {
                         let output = state.pick_string_output();
                         match output {
-                            Some(str) => {
+                            (Some(str), _) => {
                                 write_to_buffer(&str, buf, max_len)
                             }
-                            None => {
-                                -1
+                            (None, status) => {
+                                status
                             }
                         }
                     }
-                    None => { -1 }
+                    None => { ERROR_STATE_IS_NULL }
                 }
             }
         });
