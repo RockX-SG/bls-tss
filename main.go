@@ -118,11 +118,14 @@ func main() {
 
 	msgHash:="6a1be824fa870c1517d9ea84013e75ba81cccb44b48a270f12f1ebe45cb2a0c7"
 
-	for i := 1; i < n; i++ {
-		sign := NewSign(msgHash, i, n, *kMachines[0].Output(), ins[i-1], outs[i-1])
-
+	n = 2
+	for i := 1; i < n + 1; i++ {
+		sign := NewSign(msgHash, i, n, *kMachines[i-1].Output(), ins[i-1], outs[i-1])
 		sMachines = append(sMachines, sign)
 	}
+
+	go sMachines[0].ProcessLoop()
+	go sMachines[1].ProcessLoop()
 
 	sMachines[0].Initialize()
 	sMachines[1].Initialize()
