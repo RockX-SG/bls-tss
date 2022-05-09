@@ -146,6 +146,6 @@ func main() {
 			}
 		}
 	}
-	fmt.Printf("result is: %v\n", sMachines[1].Output())
+	fmt.Printf("result is: %v\n", *sMachines[1].Output())
 
 }
