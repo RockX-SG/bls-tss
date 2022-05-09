@@ -1,4 +1,4 @@
-# multi-party-bls-wrapper
+# BLS TSS
 
 Run the demo:
 
