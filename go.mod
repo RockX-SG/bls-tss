@@ -1,3 +1,3 @@
-module github.com/RockX-SG/multi-party-bls-wrapper
+module github.com/RockX-SG/bls-tss
 
 go 1.17

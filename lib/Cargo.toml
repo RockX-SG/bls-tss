@@ -1,5 +1,5 @@
 [package]
-name = "multi-party-bls-wrapper"
+name = "bls-tss"
 version = "0.1.0"
 edition = "2021"
 

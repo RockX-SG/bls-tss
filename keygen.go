@@ -1,10 +1,10 @@
-package main
+package bls_tss
 
 /*
-#cgo LDFLAGS: -L./target/release -lmulti_party_bls_wrapper
+#cgo LDFLAGS: -L./lib/target/release -lbls_tss
 #include <stdio.h>
 #include <stdlib.h>
-#include "./bls.h"
+#include "./lib/tss.h"
 */
 import "C"
 import (

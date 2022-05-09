@@ -4,21 +4,9 @@ import "C"
 import (
 	"encoding/json"
 	"fmt"
+	tss "github.com/RockX-SG/bls-tss"
 	"time"
 )
-
-
-const BufferSize = 2048
-
-type ProtocolMessage struct {
-	Sender   int                    `json:"sender"`
-	Receiver int                    `json:"receiver"`
-	Ignored  map[string]interface{} `json:"-"` // Rest of the fields should go here.
-}
-
-func runMachines(){
-
-}
 
 func main() {
 
@@ -27,21 +15,21 @@ func main() {
 	var (
 		ins  []chan string
 		outs      []chan string
-		kMachines [] *Keygen
-		sMachines [] *Sign
+		kMachines [] *tss.Keygen
+		sMachines [] *tss.Sign
 	)
 
 
 	for i := 1; i < n + 1; i++ {
 		in := make(chan string, n)
 		out := make(chan string, n)
-		keygen := NewKeygen(i, t, n, in, out)
+		keygen := tss.NewKeygen(i, t, n, in, out)
 		ins = append(ins, in)
 		outs = append(outs, out)
 		kMachines = append(kMachines, keygen)
 	}
 
-	defer func(machines []*Keygen){
+	defer func(machines []*tss.Keygen){
 		for _, machine := range machines {
 			machine.Free()
 		}
@@ -50,7 +38,7 @@ func main() {
 
 	go func(o1 <-chan string, o2 <-chan string, o3 <-chan string, i1 chan<- string,i2 chan<- string,i3 chan<- string) {
 		send := func (str string){
-			msg := ProtocolMessage{}
+			msg := tss.ProtocolMessage{}
 			if err := json.Unmarshal([]byte(str), &msg); err != nil {
 				fmt.Printf("error: %v\n", err)
 			}else {
@@ -107,7 +95,7 @@ func main() {
 		case <-time.After(1 * time.Second):
 			allFinished = true
 			for _, machine := range kMachines {
-				allFinished = allFinished && machine.output != nil
+				allFinished = allFinished && machine.Output() != nil
 			}
 			fmt.Printf("keygen allFinished: %v\n", allFinished)
 			if allFinished {
@@ -120,7 +108,7 @@ func main() {
 
 	n = 2
 	for i := 1; i < n + 1; i++ {
-		sign := NewSign(msgHash, i, n, *kMachines[i-1].Output(), ins[i-1], outs[i-1])
+		sign := tss.NewSign(msgHash, i, n, *kMachines[i-1].Output(), ins[i-1], outs[i-1])
 		sMachines = append(sMachines, sign)
 	}
 
@@ -138,7 +126,7 @@ func main() {
 		case <-time.After(1 * time.Second):
 			allFinished = true
 			for _, machine := range sMachines {
-				allFinished = allFinished && machine.output != nil
+				allFinished = allFinished && machine.Output() != nil
 			}
 			fmt.Printf("sign allFinished: %v\n", allFinished)
 			if allFinished {
