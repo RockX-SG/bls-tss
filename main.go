@@ -16,14 +16,19 @@ type ProtocolMessage struct {
 	Ignored  map[string]interface{} `json:"-"` // Rest of the fields should go here.
 }
 
+func runMachines(){
+
+}
+
 func main() {
 
 	t := 1
 	n := 3
 	var (
 		ins  []chan string
-		outs []chan string
-		machines    [] *Keygen
+		outs      []chan string
+		kMachines [] *Keygen
+		sMachines [] *Sign
 	)
 
 
@@ -33,14 +38,14 @@ func main() {
 		keygen := NewKeygen(i, t, n, in, out)
 		ins = append(ins, in)
 		outs = append(outs, out)
-		machines = append(machines, keygen)
+		kMachines = append(kMachines, keygen)
 	}
 
 	defer func(machines []*Keygen){
 		for _, machine := range machines {
 			machine.Free()
 		}
-	}(machines)
+	}(kMachines)
 
 
 	go func(o1 <-chan string, o2 <-chan string, o3 <-chan string, i1 chan<- string,i2 chan<- string,i3 chan<- string) {
@@ -88,26 +93,56 @@ func main() {
 		}
 	}(outs[0],outs[1],outs[2],ins[0],ins[1],ins[2])
 
-	go machines[0].ProcessLoop()
-	go machines[1].ProcessLoop()
-	go machines[2].ProcessLoop()
+	go kMachines[0].ProcessLoop()
+	go kMachines[1].ProcessLoop()
+	go kMachines[2].ProcessLoop()
 
-	machines[0].Initialize()
-	machines[1].Initialize()
-	machines[2].Initialize()
+	kMachines[0].Initialize()
+	kMachines[1].Initialize()
+	kMachines[2].Initialize()
 
 	var allFinished bool
 	for !allFinished {
 		select {
 		case <-time.After(1 * time.Second):
 			allFinished = true
-			for _, machine := range machines {
+			for _, machine := range kMachines {
 				allFinished = allFinished && machine.output != nil
 			}
-			fmt.Printf("allFinished: %v\n", allFinished)
+			fmt.Printf("keygen allFinished: %v\n", allFinished)
 			if allFinished {
 				break
 			}
 		}
 	}
+
+	msgHash:="6a1be824fa870c1517d9ea84013e75ba81cccb44b48a270f12f1ebe45cb2a0c7"
+
+	for i := 1; i < n; i++ {
+		sign := NewSign(msgHash, i, n, *kMachines[0].Output(), ins[i-1], outs[i-1])
+
+		sMachines = append(sMachines, sign)
+	}
+
+	sMachines[0].Initialize()
+	sMachines[1].Initialize()
+	//sMachines[2].Initialize()
+
+
+	allFinished = false
+	for !allFinished {
+		select {
+		case <-time.After(1 * time.Second):
+			allFinished = true
+			for _, machine := range sMachines {
+				allFinished = allFinished && machine.output != nil
+			}
+			fmt.Printf("sign allFinished: %v\n", allFinished)
+			if allFinished {
+				break
+			}
+		}
+	}
+	fmt.Printf("result is: %v\n", sMachines[1].Output())
+
 }
