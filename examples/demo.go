@@ -112,6 +112,12 @@ func main() {
 		sMachines = append(sMachines, sign)
 	}
 
+	defer func(machines []*tss.Sign){
+		for _, machine := range machines {
+			machine.Free()
+		}
+	}(sMachines)
+
 	go sMachines[0].ProcessLoop()
 	go sMachines[1].ProcessLoop()
 
