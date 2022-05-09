@@ -71,11 +71,11 @@ impl StateMachineOutput for Sign {
     }
 }
 
-unsafe fn write_to_buffer(output: &String, buf: *mut cty::c_char, maxlen: cty::c_int) -> cty::c_int {
+unsafe fn write_to_buffer(output: &String, buf: *mut cty::c_char, max_len: cty::c_int) -> cty::c_int {
     let src = output.as_bytes().as_ptr();
     let len = output.as_bytes().len();
     let len_c_int = len as cty::c_int;
-    if len_c_int <= maxlen - 1 {
+    if len_c_int <= max_len - 1 {
         unsafe {
             std::ptr::copy(src, buf as *mut u8, len);
             (*buf.offset(len as isize)) = 0;
@@ -204,7 +204,7 @@ macro_rules! create_outgoing_function {
         concat_idents!(full_name=$sm_name, _, outgoing, {
 
             #[no_mangle]
-            pub unsafe extern "C" fn full_name(state: Option<&mut $sm_type>, buf: *mut cty::c_char, maxlen: cty::c_int) -> cty::c_int {
+            pub unsafe extern "C" fn full_name(state: Option<&mut $sm_type>, buf: *mut cty::c_char, max_len: cty::c_int) -> cty::c_int {
                 match state {
                     Some(state) => {
                         let msg = state.message_queue().drain(..1).next();
@@ -213,7 +213,7 @@ macro_rules! create_outgoing_function {
                                 let res = serde_json::to_string(&msg);
                                 match res {
                                     Ok(str) => {
-                                        write_to_buffer(&str, buf, maxlen)
+                                        write_to_buffer(&str, buf, max_len)
                                     }
                                     Err(e) => {
                                         -2
@@ -235,23 +235,13 @@ macro_rules! create_pick_output_function {
         concat_idents!(full_name=$sm_name, _, pick_output, {
 
             #[no_mangle]
-            pub unsafe extern "C" fn full_name(state: Option<&mut $sm_type>, buf: *mut cty::c_char, maxlen: cty::c_int) -> cty::c_int {
+            pub unsafe extern "C" fn full_name(state: Option<&mut $sm_type>, buf: *mut cty::c_char, max_len: cty::c_int) -> cty::c_int {
                 match state {
                     Some(state) => {
                         let output = state.pick_string_output();
                         match output {
                             Some(str) => {
-                                // let str = output.output_to_string();
-                                write_to_buffer(&str, buf, maxlen)
-                                // let res = serde_json::to_string(&output);
-                                // match res {
-                                //     Ok(str) => {
-                                //         write_to_buffer(&str, buf, maxlen)
-                                //     }
-                                //     Err(e) => {
-                                //         -2
-                                //     }
-                                // }
+                                write_to_buffer(&str, buf, max_len)
                             }
                             None => {
                                 -1

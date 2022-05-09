@@ -11,9 +11,9 @@ int keygen_wants_to_proceed(const void* state);
 int keygen_proceed(void* state);
 int keygen_has_outgoing(void* state);
 int keygen_is_finished(void* state);
-int keygen_pick_output(void* state, char* buf, int maxlen);
+int keygen_pick_output(void* state, char* buf, int max_len);
 int keygen_incoming(void* state, const char* msg);
-int keygen_outgoing(void* state, char* buf, int maxlen);
+int keygen_outgoing(void* state, char* buf, int max_len);
 
 void* new_sign(const char* msg_hash, int i, int n, const char* local_key);
 void free_sign(void* state);
