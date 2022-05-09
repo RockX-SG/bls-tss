@@ -25,8 +25,8 @@ int sign_wants_to_proceed(const void* state);
 int sign_proceed(void* state);
 int sign_has_outgoing(void* state);
 int sign_is_finished(void* state);
-int sign_pick_output(void* state, char* buf, int maxlen);
+int sign_pick_output(void* state, char* buf, int max_len);
 int sign_incoming(void* state, const char* msg);
-int sign_outgoing(void* state, char* buf, int maxlen);
+int sign_outgoing(void* state, char* buf, int max_len);
 
 #endif
