@@ -1,9 +1,10 @@
 package bls_tss
 
 /*
+#cgo CFLAGS:-I${SRCDIR}/bls-tss/include
 #include <stdio.h>
 #include <stdlib.h>
-#include "./lib/tss.h"
+#include <tss.h>
 */
 import "C"
 import (
