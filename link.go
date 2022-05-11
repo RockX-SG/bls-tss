@@ -5,5 +5,6 @@ package bls_tss
 #cgo linux,arm64 LDFLAGS:-L${SRCDIR}/bls-tss/lib/linux/arm64
 #cgo darwin,amd64 LDFLAGS:-L${SRCDIR}/bls-tss/lib/darwin/amd64
 #cgo darwin,arm64 LDFLAGS:-L${SRCDIR}/bls-tss/lib/darwin/arm64
+#cgo windows,amd64 LDFLAGS:-L${SRCDIR}/bls-tss/lib/windows/amd64
 */
 import "C"

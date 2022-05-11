@@ -23,6 +23,11 @@ darwin-arm64:
 	cargo build --target=aarch64-apple-darwin --verbose --release
 	cp target/aarch64-apple-darwin/release/libbls_tss.a lib/darwin/arm64
 
+.PHONY: windows-amd64
+windows-amd64:
+	cargo build --target=x86_64-pc-windows-gnu --verbose --release
+	cp target/x86_64-pc-windows-gnu/release/libbls_tss.a lib/windows/amd64
+
 .PHONY: clean
 clean:
 	rm -rf target
