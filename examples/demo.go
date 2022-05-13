@@ -104,7 +104,7 @@ func main() {
 		}
 	}
 
-	msgHash:="6a1be824fa870c1517d9ea84013e75ba81cccb44b48a270f12f1ebe45cb2a0c7"
+	msgHash:="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // 32 * "a"
 
 	n = 2
 	for i := 1; i < n + 1; i++ {

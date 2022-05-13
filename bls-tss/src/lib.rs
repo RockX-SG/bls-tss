@@ -1,13 +1,13 @@
 #![feature(proc_macro_hygiene)]
 
-use bls::threshold_bls::state_machine::keygen::{Keygen, LocalKey};
-use bls::threshold_bls::state_machine::sign::{Sign};
+use bls_eth::threshold_bls::state_machine::keygen::{Keygen, LocalKey};
+use bls_eth::threshold_bls::state_machine::sign::{Sign};
 use round_based::{Msg, StateMachine};
 use std::convert::From;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::fmt::Debug;
-use bls::basic_bls::BLSSignature;
+use bls_eth::basic_bls::BLSSignature;
 use cty::c_char;
 use concat_idents::concat_idents;
 use anyhow::Result;
