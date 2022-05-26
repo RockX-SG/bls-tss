@@ -1,14 +1,10 @@
 #![feature(proc_macro_hygiene)]
-
 use bls_eth::threshold_bls::state_machine::keygen::{Keygen, LocalKey};
 use bls_eth::threshold_bls::state_machine::sign::{Sign};
 use round_based::{Msg, StateMachine};
 use std::convert::From;
 use std::ffi::CStr;
-use std::ffi::CString;
-use std::fmt::Debug;
-use bls_eth::basic_bls::BLSSignature;
-use cty::c_char;
+use std::fmt::{Debug, Display};
 use concat_idents::concat_idents;
 use anyhow::Result;
 
@@ -78,7 +74,7 @@ impl StateMachineOutput for Sign {
     }
 }
 
-unsafe fn write_to_buffer(output: &String, buf: *mut cty::c_char, max_len: cty::c_int) -> cty::c_int {
+fn write_to_buffer(output: &String, buf: *mut cty::c_char, max_len: cty::c_int) -> cty::c_int {
     let src = output.as_bytes().as_ptr();
     let len = output.as_bytes().len();
     let len_c_int = len as cty::c_int;
@@ -93,7 +89,7 @@ unsafe fn write_to_buffer(output: &String, buf: *mut cty::c_char, max_len: cty::
     }
 }
 
-fn ret_or_err<T, E>(res: Result<T, E>) -> *mut T where E: Debug {
+fn ret_or_err<T, E>(res: Result<T, E>) -> *mut T where E: Debug + Display {
     match res {
         Ok(res) => { Box::into_raw(Box::new(res)) }
         Err(e) => {
@@ -173,15 +169,15 @@ macro_rules! create_incoming_function {
     ($sm_type:ty,$sm_name:ident) => {
         concat_idents!(full_name=$sm_name, _, incoming, {
             #[no_mangle]
-            pub unsafe extern "C" fn full_name(state: Option<&mut $sm_type>, buf: *const cty::c_char) -> cty::c_int {
+            pub extern "C" fn full_name(state: Option<&mut $sm_type>, buf: *const cty::c_char) -> cty::c_int {
                 match state {
                     Some(state) => {
                         let arr = unsafe { CStr::from_ptr(buf).to_bytes() };
                         let res = serde_json::from_slice::<Msg<<$sm_type as StateMachine>::MessageBody>>(arr);
                         match res {
                             Ok(msg) => {
-                                let hRes = state.handle_incoming(msg);
-                                match hRes {
+                                let h_res = state.handle_incoming(msg);
+                                match h_res {
                                     Ok(_) => {
                                         STATUS_OK
                                     }
@@ -222,7 +218,7 @@ macro_rules! create_outgoing_function {
                                     Ok(str) => {
                                         write_to_buffer(&str, buf, max_len)
                                     }
-                                    Err(e) => {
+                                    Err(_) => {
                                         ERROR_MESSAGE_SERDE_ERROR
                                     }
                                 }

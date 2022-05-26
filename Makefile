@@ -10,9 +10,7 @@ run-all: run-demo
 
 .PHONY: build-demo
 build-demo:
-	cd lib && cargo build --release
-	cp lib/target/release/libbls_tss.so lib/target/release/libbls_tss.a lib/
-	go build -ldflags="-r $(ROOT_DIR)lib" examples/demo.go
+	go build -o demo examples/demo.go
 
 .PHONY: run-demo
 run-demo: build-demo
@@ -20,4 +18,4 @@ run-demo: build-demo
 
 .PHONY: clean
 clean:
-	rm -rf demo lib/libbls_tss.so lib/libbls_tss.a lib/target
+	rm -rf demo
