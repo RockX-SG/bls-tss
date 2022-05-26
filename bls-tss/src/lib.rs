@@ -97,7 +97,7 @@ fn ret_or_err<T, E>(res: Result<T, E>) -> *mut T where E: Debug {
     match res {
         Ok(res) => { Box::into_raw(Box::new(res)) }
         Err(e) => {
-            println!("error: {:?}", e);
+            log::error!("Encountered error: {}", e);
             std::ptr::null_mut()
         }
     }
@@ -156,7 +156,7 @@ macro_rules! create_proceed_function {
                         match state.proceed() {
                             Ok(_) => {STATUS_OK}
                             Err(e) => {
-                                println!("error: {:?}", e);
+                                log::error!("Failed to proceed: {}", e);
                                 ERROR_STATE_MACHINE_INTERNAL_ERROR
                             }
                         }
@@ -186,13 +186,13 @@ macro_rules! create_incoming_function {
                                         STATUS_OK
                                     }
                                     Err(e) => {
-                                        println!("error: {:?}", e);
+                                        log::error!("Failed to handle incoming message: {}", e);
                                         ERROR_STATE_MACHINE_INTERNAL_ERROR
                                     }
                                 }
                             }
                             Err(e) => {
-                                println!("error: {:?}", e);
+                                log::error!("Failed to parse incoming message: {}", e);
                                 ERROR_MESSAGE_SERDE_ERROR
                             }
                         }
@@ -315,7 +315,7 @@ pub extern "C" fn new_sign(message_hash: *const cty::c_char, i: cty::c_int, n: c
             ret_or_err(state)
         }
         Err(e) => {
-            println!("error: {:?}", e);
+            log::error!("Failed to decode the local key: {}", e);
             std::ptr::null_mut()
         }
     }
