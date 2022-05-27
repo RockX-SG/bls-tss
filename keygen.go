@@ -8,7 +8,7 @@ package bls_tss
 */
 import "C"
 import (
-	"fmt"
+	log "github.com/sirupsen/logrus"
 	"time"
 	"unsafe"
 )
@@ -41,31 +41,30 @@ func (k *Keygen) Output() * string{
 
 func (k *Keygen) proceedIfNeeded() {
 	res := C.keygen_wants_to_proceed(k.state)
-	fmt.Printf("%v keygen_wants_to_proceed: %v\n", k.i, res)
+	log.Debugf("%v keygen_wants_to_proceed: %v\n", k.i, res)
 	if res == 1 {
 		res = C.keygen_proceed(k.state)
-		fmt.Printf("%v keygen_proceed: %v\n", k.i, res)
+		log.Debugf("%v keygen_proceed: %v\n", k.i, res)
 	}
 }
 
 func (k *Keygen) sendOutgoingIfThereIs() {
 	res := C.keygen_has_outgoing(k.state)
-	fmt.Printf("%v keygen_has_outgoing: %v\n", k.i, res)
+	log.Debugf("%v keygen_has_outgoing: %v\n", k.i, res)
 	for res > 0 {
 		outgoingBytesSize := C.keygen_outgoing(k.state, (*C.char)(k.buffer), BufferSize)
 
-		fmt.Printf("%v outgoing bytes size: %v\n", k.i, outgoingBytesSize)
-		fmt.Printf("%v outgoing is:\n", k.i)
-		fmt.Printf("\033[0;32m")
-		fmt.Printf("%s\n", C.GoString((*C.char)(k.buffer)))
-		fmt.Printf("\033[0m")
+		log.Debugf("%v outgoing bytes size: %v\n", k.i, outgoingBytesSize)
+		log.Debugf("%v outgoing bytes size: %v\n", k.i, outgoingBytesSize)
+		log.Debugf("%v outgoing is:\n", k.i)
+		log.Debugf("%s\n", C.GoString((*C.char)(k.buffer)))
 		k.outgoing <- C.GoString((*C.char)(k.buffer))
 		res = C.keygen_has_outgoing(k.state)
 	}
 }
 
 //func (k *Keygen) waitForIncoming(msg string) {
-//	fmt.Printf("incoming > ")
+//	log.Debugf("incoming > ")
 //	//fgets(buffer, BUFFER_SIZE, stdin);
 //	//text, _ := stdin.ReadString('\n')
 //	cText := C.CString(msg)
@@ -74,7 +73,7 @@ func (k *Keygen) sendOutgoingIfThereIs() {
 //}
 
 func (k *Keygen) handleIncoming(msg string) {
-	fmt.Printf("%v has incoming: %v\n", k.i, msg)
+	log.Debugf("%v has incoming: %v\n", k.i, msg)
 	cText := C.CString(msg)
 	defer C.free(unsafe.Pointer(cText))
 	C.keygen_incoming(k.state, cText)
@@ -89,7 +88,7 @@ func (k *Keygen) finishIfPossible() {
 	output := C.GoString((*C.char)(k.buffer))
 	k.output = &output
 	if res > 0 {
-		fmt.Printf("%v Output is:\n%v\n", k.i, output)
+		log.Debugf("%v Output is:\n%v\n", k.i, output)
 	}
 }
 
@@ -107,7 +106,7 @@ func (k *Keygen) ProcessLoop() {
 			}
 		case <-time.After(1 * time.Second):
 			finished = k.output != nil
-			fmt.Printf("%v finished: %v\n", k.i, finished)
+			log.Debugf("%v finished: %v\n", k.i, finished)
 			if finished {
 				break
 			} else {

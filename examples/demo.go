@@ -5,8 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 	tss "github.com/RockX-SG/bls-tss"
+	log "github.com/sirupsen/logrus"
+	"os"
 	"time"
 )
+
+func init() {
+	log.SetFormatter(&log.TextFormatter{})
+
+	//Set log output to standard output (default output is stderr, standard error)
+	//Log message output can be any io.writer type
+	log.SetOutput(os.Stdout)
+
+	log.SetLevel(log.DebugLevel)
+}
 
 func main() {
 
@@ -97,14 +109,14 @@ func main() {
 			for _, machine := range kMachines {
 				allFinished = allFinished && machine.Output() != nil
 			}
-			fmt.Printf("keygen allFinished: %v\n", allFinished)
+			log.Debugf("keygen allFinished: %v\n", allFinished)
 			if allFinished {
 				break
 			}
 		}
 	}
 
-	msgHash:="6a1be824fa870c1517d9ea84013e75ba81cccb44b48a270f12f1ebe45cb2a0c7"
+	msgHash:="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // 32 * "a"
 
 	n = 2
 	for i := 1; i < n + 1; i++ {
@@ -134,12 +146,12 @@ func main() {
 			for _, machine := range sMachines {
 				allFinished = allFinished && machine.Output() != nil
 			}
-			fmt.Printf("sign allFinished: %v\n", allFinished)
+			log.Debugf("sign allFinished: %v\n", allFinished)
 			if allFinished {
 				break
 			}
 		}
 	}
-	fmt.Printf("result is: %v\n", *sMachines[1].Output())
+	log.Infof("signature is: %v\n", *sMachines[1].Output())
 
 }
