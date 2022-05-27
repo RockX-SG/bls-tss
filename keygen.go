@@ -41,23 +41,20 @@ func (k *Keygen) Output() * string{
 
 func (k *Keygen) proceedIfNeeded() {
 	res := C.keygen_wants_to_proceed(k.state)
-	log.Debugf("%v keygen_wants_to_proceed: %v\n", k.i, res)
+	k.trace("keygen_wants_to_proceed", res)
 	if res == 1 {
 		res = C.keygen_proceed(k.state)
-		log.Debugf("%v keygen_proceed: %v\n", k.i, res)
+		k.trace("keygen_proceed", res)
 	}
 }
 
 func (k *Keygen) sendOutgoingIfThereIs() {
 	res := C.keygen_has_outgoing(k.state)
-	log.Debugf("%v keygen_has_outgoing: %v\n", k.i, res)
+	k.trace("keygen_has_outgoing", res)
 	for res > 0 {
 		outgoingBytesSize := C.keygen_outgoing(k.state, (*C.char)(k.buffer), BufferSize)
-
-		log.Debugf("%v outgoing bytes size: %v\n", k.i, outgoingBytesSize)
-		log.Debugf("%v outgoing bytes size: %v\n", k.i, outgoingBytesSize)
-		log.Debugf("%v outgoing is:\n", k.i)
-		log.Debugf("%s\n", C.GoString((*C.char)(k.buffer)))
+		k.trace("keygen_outgoing_size", outgoingBytesSize)
+		k.trace("keygen_outgoing", C.GoString((*C.char)(k.buffer)))
 		k.outgoing <- C.GoString((*C.char)(k.buffer))
 		res = C.keygen_has_outgoing(k.state)
 	}
@@ -73,7 +70,7 @@ func (k *Keygen) sendOutgoingIfThereIs() {
 //}
 
 func (k *Keygen) handleIncoming(msg string) {
-	log.Debugf("%v has incoming: %v\n", k.i, msg)
+	k.trace("incoming", msg)
 	cText := C.CString(msg)
 	defer C.free(unsafe.Pointer(cText))
 	C.keygen_incoming(k.state, cText)
@@ -88,7 +85,7 @@ func (k *Keygen) finishIfPossible() {
 	output := C.GoString((*C.char)(k.buffer))
 	k.output = &output
 	if res > 0 {
-		log.Debugf("%v Output is:\n%v\n", k.i, output)
+		k.trace("keygen_pick_output", output)
 	}
 }
 
@@ -106,7 +103,7 @@ func (k *Keygen) ProcessLoop() {
 			}
 		case <-time.After(1 * time.Second):
 			finished = k.output != nil
-			log.Debugf("%v finished: %v\n", k.i, finished)
+			k.trace("finished", finished)
 			if finished {
 				break
 			} else {
@@ -116,6 +113,14 @@ func (k *Keygen) ProcessLoop() {
 			}
 		}
 	}
+}
+
+func (k *Keygen) trace(funcName string, result interface{}){
+	log.WithFields(log.Fields{
+		"participant": k.i,
+		"funcName": funcName,
+		"result": result,
+	}).Trace("statusCheck")
 }
 
 func (k *Keygen) Initialize() {

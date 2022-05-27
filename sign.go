@@ -48,22 +48,20 @@ func (k *Sign) Output() * string{
 
 func (k *Sign) proceedIfNeeded() {
 	res := C.sign_wants_to_proceed(k.state)
-	log.Debugf("%v sign_wants_to_proceed: %v\n", k.i, res)
+	k.trace("sign_wants_to_proceed", res)
 	if res == 1 {
 		res = C.sign_proceed(k.state)
-		log.Debugf("%v sign_proceed: %v\n", k.i, res)
+		k.trace("sign_proceed", res)
 	}
 }
 
 func (k *Sign) sendOutgoingIfThereIs() {
 	res := C.sign_has_outgoing(k.state)
-	log.Debugf("%v sign_has_outgoing: %v\n", k.i, res)
+	k.trace("sign_has_outgoing", res)
 	for res > 0 {
 		outgoingBytesSize := C.sign_outgoing(k.state, (*C.char)(k.buffer), BufferSize)
-
-		log.Debugf("%v outgoing bytes size: %v\n", k.i, outgoingBytesSize)
-		log.Debugf("%v outgoing is:\n", k.i)
-		log.Debugf("%s\n", C.GoString((*C.char)(k.buffer)))
+		k.trace("sign_outgoing_size", outgoingBytesSize)
+		k.trace("sign_outgoing", C.GoString((*C.char)(k.buffer)))
 		k.outgoing <- C.GoString((*C.char)(k.buffer))
 		res = C.sign_has_outgoing(k.state)
 	}
@@ -79,7 +77,7 @@ func (k *Sign) sendOutgoingIfThereIs() {
 //}
 
 func (k *Sign) handleIncoming(msg string) {
-	log.Debugf("%v has incoming: %v\n", k.i, msg)
+	k.trace("incoming", msg)
 	cText := C.CString(msg)
 	defer C.free(unsafe.Pointer(cText))
 	C.sign_incoming(k.state, cText)
@@ -94,7 +92,7 @@ func (k *Sign) finishIfPossible() {
 	output := C.GoString((*C.char)(k.buffer))
 	k.output = &output
 	if res > 0 {
-		log.Debugf("%v Output is:\n%v\n", k.i, output)
+		k.trace("sign_pick_output", output)
 	}
 }
 
@@ -112,7 +110,7 @@ func (k *Sign) ProcessLoop() {
 			}
 		case <-time.After(1 * time.Second):
 			finished = k.output != nil
-			log.Debugf("%v finished: %v\n", k.i, finished)
+			k.trace("finished", finished)
 			if finished {
 				break
 			} else {
@@ -122,6 +120,14 @@ func (k *Sign) ProcessLoop() {
 			}
 		}
 	}
+}
+
+func (k *Sign) trace(funcName string, result interface{}){
+	log.WithFields(log.Fields{
+		"participant": k.i,
+		"funcName": funcName,
+		"result": result,
+	}).Trace("statusCheck")
 }
 
 func (k *Sign) Initialize() {

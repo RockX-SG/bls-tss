@@ -93,6 +93,7 @@ func main() {
 		}
 	}(outs[0],outs[1],outs[2],ins[0],ins[1],ins[2])
 
+	log.Debug("Staring keygen")
 	go kMachines[0].ProcessLoop()
 	go kMachines[1].ProcessLoop()
 	go kMachines[2].ProcessLoop()
@@ -100,6 +101,7 @@ func main() {
 	kMachines[0].Initialize()
 	kMachines[1].Initialize()
 	kMachines[2].Initialize()
+	log.Debug("Keygen started")
 
 	var allFinished bool
 	for !allFinished {
@@ -109,12 +111,13 @@ func main() {
 			for _, machine := range kMachines {
 				allFinished = allFinished && machine.Output() != nil
 			}
-			log.Debugf("keygen allFinished: %v\n", allFinished)
+			log.Tracef("keygen allFinished: %v\n", allFinished)
 			if allFinished {
 				break
 			}
 		}
 	}
+	log.Debug("Keygen completed")
 
 	msgHash:="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // 32 * "a"
 
@@ -130,13 +133,14 @@ func main() {
 		}
 	}(sMachines)
 
+	log.Debug("Start signing")
 	go sMachines[0].ProcessLoop()
 	go sMachines[1].ProcessLoop()
 
 	sMachines[0].Initialize()
 	sMachines[1].Initialize()
 	//sMachines[2].Initialize()
-
+	log.Debug("Signing started")
 
 	allFinished = false
 	for !allFinished {
@@ -146,12 +150,14 @@ func main() {
 			for _, machine := range sMachines {
 				allFinished = allFinished && machine.Output() != nil
 			}
-			log.Debugf("sign allFinished: %v\n", allFinished)
+			log.Tracef("sign allFinished: %v\n", allFinished)
 			if allFinished {
 				break
 			}
 		}
 	}
+	log.Debug("Signing completed")
+	log.Infof("msgHash is: %v\n", msgHash)
 	log.Infof("signature is: %v\n", *sMachines[1].Output())
 
 }
