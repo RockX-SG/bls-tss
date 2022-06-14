@@ -93,7 +93,7 @@ func main() {
 		}
 	}(outs[0],outs[1],outs[2],ins[0],ins[1],ins[2])
 
-	log.Debug("Staring keygen")
+	log.Debug("Starting keygen")
 	go kMachines[0].ProcessLoop()
 	go kMachines[1].ProcessLoop()
 	go kMachines[2].ProcessLoop()
@@ -101,7 +101,7 @@ func main() {
 	kMachines[0].Initialize()
 	kMachines[1].Initialize()
 	kMachines[2].Initialize()
-	log.Debug("Keygen started")
+	log.Debug("KeygenSimple started")
 
 	var allFinished bool
 	for !allFinished {
@@ -117,7 +117,7 @@ func main() {
 			}
 		}
 	}
-	log.Debug("Keygen completed")
+	log.Debug("KeygenSimple completed")
 
 	msgHash:="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // 32 * "a"
 
