@@ -38,7 +38,6 @@ func (k *Keygen) ProcessLoop() {
 			if ok {
 				_, outgoing, _ := k.inner.Handle(msg)
 				k.pendingOutgoing = append(k.pendingOutgoing, outgoing...)
-				k.trace("finished", len(outgoing))
 				k.trace("outgoing", len(outgoing))
 			}
 		case <-time.After(1 * time.Second):

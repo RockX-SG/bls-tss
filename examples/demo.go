@@ -25,14 +25,13 @@ func main() {
 	t := 1
 	n := 3
 	var (
-		ins  []chan string
+		ins       []chan string
 		outs      []chan string
-		kMachines [] *tss.Keygen
-		sMachines [] *tss.Sign
+		kMachines []*tss.Keygen
+		sMachines []*tss.Sign
 	)
 
-
-	for i := 1; i < n + 1; i++ {
+	for i := 1; i < n+1; i++ {
 		in := make(chan string, n)
 		out := make(chan string, n)
 		keygen := tss.NewKeygen(i, t, n, in, out)
@@ -41,19 +40,18 @@ func main() {
 		kMachines = append(kMachines, keygen)
 	}
 
-	defer func(machines []*tss.Keygen){
+	defer func(machines []*tss.Keygen) {
 		for _, machine := range machines {
 			machine.Free()
 		}
 	}(kMachines)
 
-
-	go func(o1 <-chan string, o2 <-chan string, o3 <-chan string, i1 chan<- string,i2 chan<- string,i3 chan<- string) {
-		send := func (str string){
+	go func(o1 <-chan string, o2 <-chan string, o3 <-chan string, i1 chan<- string, i2 chan<- string, i3 chan<- string) {
+		send := func(str string) {
 			msg := tss.ProtocolMessage{}
 			if err := json.Unmarshal([]byte(str), &msg); err != nil {
 				fmt.Printf("error: %v\n", err)
-			}else {
+			} else {
 				switch msg.Receiver {
 				case 0:
 					if msg.Sender != 1 {
@@ -91,7 +89,7 @@ func main() {
 			case <-time.After(1 * time.Second):
 			}
 		}
-	}(outs[0],outs[1],outs[2],ins[0],ins[1],ins[2])
+	}(outs[0], outs[1], outs[2], ins[0], ins[1], ins[2])
 
 	log.Debug("Starting keygen")
 	go kMachines[0].ProcessLoop()
@@ -118,16 +116,21 @@ func main() {
 		}
 	}
 	log.Debug("KeygenSimple completed")
+	for _, machine := range kMachines {
+		log.WithFields(log.Fields{
+			"result": *machine.Output(),
+		}).Trace("keygen result")
+	}
 
-	msgHash:="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // 32 * "a"
+	msgHash := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // 32 * "a"
 
 	n = 2
-	for i := 1; i < n + 1; i++ {
+	for i := 1; i < n+1; i++ {
 		sign := tss.NewSign(msgHash, i, n, *kMachines[i-1].Output(), ins[i-1], outs[i-1])
 		sMachines = append(sMachines, sign)
 	}
 
-	defer func(machines []*tss.Sign){
+	defer func(machines []*tss.Sign) {
 		for _, machine := range machines {
 			machine.Free()
 		}

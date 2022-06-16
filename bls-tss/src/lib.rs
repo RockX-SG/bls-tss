@@ -1,5 +1,6 @@
 #![feature(proc_macro_hygiene)]
-use bls_eth::threshold_bls::state_machine::keygen::{Keygen, LocalKey};
+use bls_eth::threshold_bls::party_i::LocalKey;
+use bls_eth::threshold_bls::state_machine::keygen::Keygen;
 use bls_eth::threshold_bls::state_machine::sign::{Sign};
 use round_based::{Msg, StateMachine};
 use std::convert::From;

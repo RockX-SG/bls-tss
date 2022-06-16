@@ -37,14 +37,13 @@ func (k *KeygenSimple) Handle(msg string) (bool, []string, error) {
 	k.proceedIfNeeded()
 	outgoing := k.getOutgoing()
 	output := k.finishIfPossible()
-	if len(outgoing) > 0 {
-		return false, outgoing, nil
-	}
-	if output != nil {
+	finished := output != nil
+
+	if finished {
 		k.output = output
-		return true, []string{*output}, nil
 	}
-	return false, nil, nil
+
+	return finished, outgoing, nil
 }
 
 func (k *KeygenSimple) Free() {
