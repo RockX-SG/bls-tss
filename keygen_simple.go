@@ -8,6 +8,7 @@ package bls_tss
 */
 import "C"
 import (
+	"encoding/json"
 	log "github.com/sirupsen/logrus"
 	"unsafe"
 )
@@ -24,6 +25,14 @@ type KeygenSimple struct {
 func NewKeygenSimple(i int, t int, n int) *KeygenSimple {
 	buffer := C.malloc(C.size_t(BufferSize))
 	state := C.new_keygen(C.int(i), C.int(t), C.int(n))
+	return &KeygenSimple{i, t, n, state, buffer, nil}
+}
+
+func NewKeygenSimpleFromRound(i, t, n int, round string) *KeygenSimple {
+	buffer := C.malloc(C.size_t(BufferSize))
+	cRound := C.CString(round)
+	defer C.free(unsafe.Pointer(cRound))
+	state := C.keygen_from_state(cRound)
 	return &KeygenSimple{i, t, n, state, buffer, nil}
 }
 
@@ -76,6 +85,23 @@ func (k *KeygenSimple) getOutgoing() []string {
 		res = C.keygen_has_outgoing(k.state)
 	}
 	return outgoing
+}
+
+func (k *KeygenSimple) GetState() (*KeygenState, error) {
+
+	res := C.keygen_get_state(k.state, (*C.char)(k.buffer), BufferSize)
+	jsonStr := C.GoString((*C.char)(k.buffer))
+
+	if res > 0 {
+		k.trace("keygen_get_state", jsonStr)
+		var state KeygenState
+		err := json.Unmarshal([]byte(jsonStr), &state)
+		if err != nil {
+			return nil, err
+		}
+		return &state, nil
+	}
+	return nil, nil
 }
 
 func (k *KeygenSimple) handleIncoming(msg string) {

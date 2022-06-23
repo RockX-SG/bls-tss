@@ -1,6 +1,6 @@
 #![feature(proc_macro_hygiene)]
 use bls_eth::threshold_bls::party_i::LocalKey;
-use bls_eth::threshold_bls::state_machine::keygen::Keygen;
+use bls_eth::threshold_bls::state_machine::keygen::{Keygen, R};
 use bls_eth::threshold_bls::state_machine::sign::{Sign};
 use round_based::{Msg, StateMachine};
 use std::convert::From;
@@ -45,6 +45,18 @@ impl ToI32 for u16 {
 
 trait StateMachineOutput {
     fn pick_string_output(&mut self) -> (Option<String>, i32);
+}
+
+trait StateMachineState {
+    fn get_string_state(&mut self) -> (Option<String>, i32);
+}
+
+impl StateMachineState for Keygen {
+    fn get_string_state(&mut self) -> (Option<String>, i32) {
+        let machine_state = self.get_state();
+        let res = serde_json::to_string(&machine_state).unwrap_or_default();
+        (Some(res), STATUS_OK)
+    }
 }
 
 impl StateMachineOutput for Keygen {
@@ -259,6 +271,31 @@ macro_rules! create_pick_output_function {
     };
 }
 
+macro_rules! create_get_state_function {
+    ($sm_type:ty,$sm_name:ident) => {
+        concat_idents!(full_name=$sm_name, _, get_state, {
+
+            #[no_mangle]
+            pub unsafe extern "C" fn full_name(state: Option<&mut $sm_type>, buf: *mut cty::c_char, max_len: cty::c_int) -> cty::c_int {
+                match state {
+                    Some(state) => {
+                        let machine_state = state.get_string_state();
+                        match machine_state {
+                            (Some(str), _) => {
+                                write_to_buffer(&str, buf, max_len)
+                            }
+                            (None, status) => {
+                                status
+                            }
+                        }
+                    }
+                    None => { ERROR_STATE_IS_NULL }
+                }
+            }
+        });
+    };
+}
+
 macro_rules! create_wrapper {
     ($sm_type:ty,$sm_name:ident) => {
 
@@ -293,10 +330,29 @@ create_wrapper!(Keygen, keygen);
 
 create_wrapper!(Sign, sign);
 
+create_get_state_function!(Keygen, keygen);
+
 #[no_mangle]
 pub extern "C" fn new_keygen(i: cty::c_int, t: cty::c_int, n: cty::c_int) -> *mut Keygen {
     let state = Keygen::new(i as u16, t as u16, n as u16);
     ret_or_err(state)
+}
+
+#[no_mangle]
+pub extern "C" fn keygen_from_state(round: *const cty::c_char) -> *mut Keygen {
+    let round = unsafe { CStr::from_ptr(round).to_bytes() };
+    let round = serde_json::from_slice::<R>(round);
+    match round {
+        Ok(round) => {
+            let state = Keygen::from(round);
+            let state: Result<Keygen> = Ok(state);
+            ret_or_err(state)
+        }
+        Err(e) => {
+            log::error!("Failed to decode the round: {}", e);
+            std::ptr::null_mut()
+        }
+    }
 }
 
 #[no_mangle]
